@@ -1,0 +1,15 @@
+package ml.gouv.pie.repository;
+
+import ml.gouv.pie.entity.TypeDocument;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.List;
+import java.util.Optional;
+
+public interface TypeDocumentRepository extends JpaRepository<TypeDocument, Long> {
+    List<TypeDocument> findByActifTrueOrderByOrdreAscLibelleAsc();
+    List<TypeDocument> findAllByOrderByOrdreAscLibelleAsc();
+    Optional<TypeDocument> findByCode(String code);
+    boolean existsByCode(String code);
+    boolean existsByCodeAndIdNot(String code, Long id);
+}
