@@ -5,8 +5,12 @@ import lombok.RequiredArgsConstructor;
 import ml.gouv.pie.dto.*;
 import ml.gouv.pie.entity.User;
 import ml.gouv.pie.entity.enums.DossierStatus;
+import ml.gouv.pie.entity.enums.ProfileChangeRequestStatus;
 import ml.gouv.pie.service.AdminService;
+import ml.gouv.pie.service.AppointmentService;
 import ml.gouv.pie.service.DocumentService;
+import ml.gouv.pie.service.PlateDeliveryService;
+import ml.gouv.pie.service.ProfileChangeRequestService;
 import ml.gouv.pie.service.ValidationService;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ResponseEntity;
@@ -25,6 +29,9 @@ public class AdminController {
     private final AdminService adminService;
     private final ValidationService validationService;
     private final DocumentService documentService;
+    private final AppointmentService appointmentService;
+    private final PlateDeliveryService plateDeliveryService;
+    private final ProfileChangeRequestService profileChangeRequestService;
 
     @GetMapping("/dashboard")
     public ResponseEntity<ApiResponse<DtoMapper.AdminDashboardStatsDto>> dashboard() {
@@ -129,12 +136,81 @@ public class AdminController {
         return ResponseEntity.ok(ApiResponse.ok("Dossier validé", validationService.validateDossier(id)));
     }
 
+    @PostMapping("/dossiers/{id}/confirm-appointment")
+    @PreAuthorize("hasAnyRole('VALIDATEUR', 'ADMIN', 'SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<DtoMapper.DossierDto>> confirmAppointment(
+            @PathVariable Long id,
+            @Valid @RequestBody AppointmentRequest request) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                "Rendez-vous confirmé",
+                appointmentService.confirmAppointment(id, request)));
+    }
+
+    @PostMapping("/dossiers/{id}/start-immatriculation")
+    @PreAuthorize("hasAnyRole('VALIDATEUR', 'ADMIN', 'SUPER_ADMIN', 'IMMATRICULATEUR')")
+    public ResponseEntity<ApiResponse<DtoMapper.DossierDto>> startImmatriculation(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                "Immatriculation démarrée",
+                validationService.startImmatriculation(id)));
+    }
+
+    @PostMapping("/dossiers/{id}/complete-immatriculation")
+    @PreAuthorize("hasAnyRole('VALIDATEUR', 'ADMIN', 'SUPER_ADMIN', 'IMMATRICULATEUR')")
+    public ResponseEntity<ApiResponse<DtoMapper.DossierDto>> completeImmatriculation(
+            @PathVariable Long id,
+            @Valid @RequestBody CompleteImmatriculationRequest request) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                "Dossier immatriculé",
+                validationService.completeImmatriculation(id, request.getRegistrationNumber())));
+    }
+
+    @PostMapping("/dossiers/{id}/cancel-immatriculation")
+    @PreAuthorize("hasAnyRole('VALIDATEUR', 'ADMIN', 'SUPER_ADMIN', 'IMMATRICULATEUR')")
+    public ResponseEntity<ApiResponse<DtoMapper.DossierDto>> cancelImmatriculation(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                "Immatriculation annulée",
+                validationService.cancelImmatriculation(id, body.getOrDefault("reason", ""))));
+    }
+
+    @GetMapping("/centers/{id}/availability")
+    public ResponseEntity<ApiResponse<CenterAvailabilityDto>> getCenterAvailability(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.ok(appointmentService.getCenterAvailability(id)));
+    }
+
     @PostMapping("/dossiers/{id}/reject")
     @PreAuthorize("hasAnyRole('VALIDATEUR', 'ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<DtoMapper.DossierDto>> reject(
             @PathVariable Long id, @RequestBody Map<String, String> body) {
         return ResponseEntity.ok(ApiResponse.ok("Dossier rejeté",
                 validationService.rejectDossier(id, body.getOrDefault("reason", "Documents non conformes"))));
+    }
+
+    @PostMapping("/dossiers/{id}/remise-plaque")
+    @PreAuthorize("hasAnyRole('IMMATRICULATEUR', 'ADMIN', 'SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<DtoMapper.DossierDto>> savePlateDelivery(
+            @PathVariable Long id,
+            @RequestParam String plateNumber,
+            @RequestParam java.time.LocalDate deliveryDate,
+            @RequestParam String collectorFirstName,
+            @RequestParam String collectorLastName,
+            @RequestParam String collectorPhone,
+            @RequestParam String collectorAddress,
+            @RequestParam(required = false) org.springframework.web.multipart.MultipartFile file) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                "Remise de plaque enregistrée",
+                plateDeliveryService.savePlateDelivery(
+                        id, plateNumber, deliveryDate, collectorFirstName, collectorLastName,
+                        collectorPhone, collectorAddress, file)));
+    }
+
+    @GetMapping("/dossiers/{dossierId}/remise-plaque/file")
+    @PreAuthorize("hasAnyRole('IMMATRICULATEUR', 'ADMIN', 'SUPER_ADMIN', 'VALIDATEUR')")
+    public ResponseEntity<Resource> getPlateDeliveryFile(@PathVariable Long dossierId) {
+        var delivery = plateDeliveryService.getForDossier(dossierId);
+        Resource resource = plateDeliveryService.loadAttachmentResource(delivery);
+        return plateDeliveryService.buildFileResponse(delivery, resource);
     }
 
     @GetMapping("/citizens")
@@ -147,6 +223,45 @@ public class AdminController {
     public ResponseEntity<ApiResponse<Void>> deleteCitizen(@PathVariable Long id) {
         adminService.deleteCitizen(id);
         return ResponseEntity.ok(ApiResponse.ok("Compte citoyen désactivé", null));
+    }
+
+    @GetMapping("/profile-change-requests")
+    @PreAuthorize("hasAnyRole('VALIDATEUR', 'ADMIN', 'SUPER_ADMIN', 'IMMATRICULATEUR')")
+    public ResponseEntity<ApiResponse<List<AdminProfileChangeRequestDto>>> listProfileChangeRequests(
+            @RequestParam(required = false) ProfileChangeRequestStatus status) {
+        return ResponseEntity.ok(ApiResponse.ok(profileChangeRequestService.listForAdmin(status)));
+    }
+
+    @GetMapping("/profile-change-requests/pending-count")
+    @PreAuthorize("hasAnyRole('VALIDATEUR', 'ADMIN', 'SUPER_ADMIN', 'IMMATRICULATEUR')")
+    public ResponseEntity<ApiResponse<Map<String, Long>>> profileChangeRequestsPendingCount() {
+        return ResponseEntity.ok(ApiResponse.ok(Map.of("count", profileChangeRequestService.countPending())));
+    }
+
+    @GetMapping("/profile-change-requests/{id}/file")
+    @PreAuthorize("hasAnyRole('VALIDATEUR', 'ADMIN', 'SUPER_ADMIN', 'IMMATRICULATEUR')")
+    public ResponseEntity<Resource> getProfileChangeRequestFile(@PathVariable Long id) {
+        return profileChangeRequestService.loadAttachment(id);
+    }
+
+    @PostMapping("/profile-change-requests/{id}/approve")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<AdminProfileChangeRequestDto>> approveProfileChangeRequest(
+            @PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                "Réclamation approuvée",
+                profileChangeRequestService.approve(id)));
+    }
+
+    @PostMapping("/profile-change-requests/{id}/reject")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<AdminProfileChangeRequestDto>> rejectProfileChangeRequest(
+            @PathVariable Long id,
+            @RequestBody(required = false) ProfileChangeRejectRequest request) {
+        String reason = request != null ? request.getReason() : null;
+        return ResponseEntity.ok(ApiResponse.ok(
+                "Réclamation rejetée",
+                profileChangeRequestService.reject(id, reason)));
     }
 
     @GetMapping("/users")

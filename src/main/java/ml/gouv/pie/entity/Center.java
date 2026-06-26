@@ -30,6 +30,9 @@ public class Center {
 
     private String address;
 
+    @Column(length = 30)
+    private String phone;
+
     private Double latitude;
 
     private Double longitude;

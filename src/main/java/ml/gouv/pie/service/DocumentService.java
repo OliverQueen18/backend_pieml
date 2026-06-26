@@ -6,6 +6,8 @@ import ml.gouv.pie.entity.Document;
 import ml.gouv.pie.entity.Dossier;
 import ml.gouv.pie.entity.TypeDocument;
 import ml.gouv.pie.entity.enums.DocumentStatus;
+import ml.gouv.pie.entity.enums.DossierStatus;
+import ml.gouv.pie.entity.enums.NotificationType;
 import ml.gouv.pie.exception.BusinessException;
 import ml.gouv.pie.repository.DocumentRepository;
 import org.springframework.core.io.FileSystemResource;
@@ -21,6 +23,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -33,6 +36,7 @@ public class DocumentService {
     private final DossierMapperService mapperService;
     private final TypeDocumentService typeDocumentService;
     private final StoredFileService storedFileService;
+    private final NotificationService notificationService;
 
     @Transactional
     public DtoMapper.DossierDto uploadDocument(String email, Long dossierId, Long typeDocumentId, MultipartFile file) {
@@ -148,6 +152,7 @@ public class DocumentService {
     @Transactional
     public DtoMapper.DossierDto validateDocuments(Long dossierId, List<Long> documentIds) {
         Dossier dossier = loadDossierWithDocuments(dossierId);
+        ensureDocumentTreatmentAllowed(dossier);
         applyDocumentStatus(dossier, documentIds, DocumentStatus.VALIDATED);
         return mapperService.toDto(dossier);
     }
@@ -155,6 +160,7 @@ public class DocumentService {
     @Transactional
     public DtoMapper.DossierDto rejectDocuments(Long dossierId, List<Long> documentIds) {
         Dossier dossier = loadDossierWithDocuments(dossierId);
+        ensureDocumentTreatmentAllowed(dossier);
         applyDocumentStatus(dossier, documentIds, DocumentStatus.REJECTED);
         return mapperService.toDto(dossier);
     }
@@ -181,6 +187,14 @@ public class DocumentService {
         document.setUploadedAt(null);
         document.setStatus(DocumentStatus.PENDING);
         documentRepository.save(document);
+
+        notificationService.create(
+                dossier.getCitizen().getUser(),
+                "Le document « " + document.getTypeDocument().getLibelle() + " » du dossier "
+                        + dossier.getReferenceNumber()
+                        + " a été supprimé par l'administration. Merci de le téléverser à nouveau.",
+                NotificationType.WARNING);
+
         return mapperService.toDto(dossier);
     }
 
@@ -188,7 +202,14 @@ public class DocumentService {
         return dossierService.getDossierEntity(dossierId);
     }
 
+    private void ensureDocumentTreatmentAllowed(Dossier dossier) {
+        if (dossier.getStatus() != DossierStatus.PAID) {
+            throw new BusinessException("Les documents ne peuvent être traités que pour un dossier payé");
+        }
+    }
+
     private void applyDocumentStatus(Dossier dossier, List<Long> documentIds, DocumentStatus status) {
+        List<String> labels = new ArrayList<>();
         for (Long documentId : documentIds) {
             Document document = dossier.getDocuments().stream()
                     .filter(d -> d.getId().equals(documentId))
@@ -199,6 +220,28 @@ public class DocumentService {
             }
             document.setStatus(status);
             documentRepository.save(document);
+            labels.add(document.getTypeDocument().getLibelle());
         }
+        notifyDocumentStatusChange(dossier, status, labels);
+    }
+
+    private void notifyDocumentStatusChange(Dossier dossier, DocumentStatus status, List<String> documentLabels) {
+        if (documentLabels.isEmpty()) {
+            return;
+        }
+        String documents = String.join(", ", documentLabels);
+        String reference = dossier.getReferenceNumber();
+        if (status == DocumentStatus.VALIDATED) {
+            notificationService.create(
+                    dossier.getCitizen().getUser(),
+                    "Document(s) validé(s) pour le dossier " + reference + " : " + documents + ".",
+                    NotificationType.DOSSIER);
+            return;
+        }
+        notificationService.create(
+                dossier.getCitizen().getUser(),
+                "Document(s) rejeté(s) pour le dossier " + reference + " : " + documents
+                        + ". Merci de fournir un document conforme.",
+                NotificationType.WARNING);
     }
 }

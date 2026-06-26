@@ -145,13 +145,11 @@ public class DossierService {
             throw new BusinessException("Tous les documents obligatoires doivent être téléversés");
         }
 
-        dossier.setStatus(autoValidate ? DossierStatus.VALIDATED : DossierStatus.SUBMITTED);
+        dossier.setStatus(DossierStatus.SUBMITTED);
         dossierRepository.save(dossier);
 
         String ref = dossier.getReferenceNumber();
-        String notifMessage = autoValidate
-                ? "Dossier " + ref + " validé. Procédez au paiement."
-                : "Dossier " + ref + " soumis pour validation";
+        String notifMessage = "Dossier " + ref + " soumis. Procédez au paiement.";
         notificationService.create(dossier.getCitizen().getUser(), notifMessage, NotificationType.DOSSIER, false);
         emailService.sendDossierSubmittedEmail(dossier.getCitizen().getUser(), ref);
 
@@ -195,13 +193,14 @@ public class DossierService {
         long enCours = dossierRepository.countByCitizenIdAndStatus(citizen.getId(), DossierStatus.DRAFT)
                 + dossierRepository.countByCitizenIdAndStatus(citizen.getId(), DossierStatus.SUBMITTED)
                 + dossierRepository.countByCitizenIdAndStatus(citizen.getId(), DossierStatus.IN_REVIEW)
-                + dossierRepository.countByCitizenIdAndStatus(citizen.getId(), DossierStatus.PAYMENT_PENDING);
-
-        long valides = dossierRepository.countByCitizenIdAndStatus(citizen.getId(), DossierStatus.VALIDATED)
+                + dossierRepository.countByCitizenIdAndStatus(citizen.getId(), DossierStatus.PAYMENT_PENDING)
                 + dossierRepository.countByCitizenIdAndStatus(citizen.getId(), DossierStatus.PAID);
 
+        long valides = dossierRepository.countByCitizenIdAndStatus(citizen.getId(), DossierStatus.VALIDATED);
+
         long rdv = dossierRepository.countByCitizenIdAndStatus(citizen.getId(), DossierStatus.APPOINTMENT_SCHEDULED);
-        long immat = dossierRepository.countByCitizenIdAndStatus(citizen.getId(), DossierStatus.COMPLETED);
+        long immat = dossierRepository.countByCitizenIdAndStatus(citizen.getId(), DossierStatus.IMMATRICULATION_IN_PROGRESS)
+                + dossierRepository.countByCitizenIdAndStatus(citizen.getId(), DossierStatus.COMPLETED);
 
         return DtoMapper.DashboardStatsDto.builder()
                 .dossiersEnCours(enCours)

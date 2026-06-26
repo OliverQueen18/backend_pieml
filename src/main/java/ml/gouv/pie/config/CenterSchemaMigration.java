@@ -21,6 +21,7 @@ public class CenterSchemaMigration {
             jdbcTemplate.execute("ALTER TABLE centers ADD COLUMN IF NOT EXISTS opening_time TIME");
             jdbcTemplate.execute("ALTER TABLE centers ADD COLUMN IF NOT EXISTS closing_time TIME");
             jdbcTemplate.execute("ALTER TABLE centers ADD COLUMN IF NOT EXISTS processing_delay_days INTEGER");
+            jdbcTemplate.execute("ALTER TABLE centers ADD COLUMN IF NOT EXISTS phone VARCHAR(30)");
 
             jdbcTemplate.update("""
                     UPDATE centers

@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import ml.gouv.pie.dto.*;
 import ml.gouv.pie.entity.User;
+import ml.gouv.pie.entity.enums.ProfileChangeField;
 import ml.gouv.pie.entity.enums.VehicleDeclarationType;
 import ml.gouv.pie.service.*;
 import org.springframework.core.io.Resource;
@@ -24,8 +25,10 @@ public class CitizenController {
     private final PaymentService paymentService;
     private final AppointmentService appointmentService;
     private final VehicleDeclarationService vehicleDeclarationService;
+    private final PlateDeliveryService plateDeliveryService;
     private final NotificationService notificationService;
     private final CitizenProfileService profileService;
+    private final ProfileChangeRequestService profileChangeRequestService;
     private final ContactService contactService;
 
     @GetMapping("/dashboard")
@@ -84,6 +87,15 @@ public class CitizenController {
                 declaration.getFileName(),
                 resource,
                 vehicleDeclarationService.resolveContentType(declaration));
+    }
+
+    @GetMapping("/dossiers/{id}/remise-plaque/file")
+    public ResponseEntity<Resource> getPlateDeliveryFile(
+            @AuthenticationPrincipal User user,
+            @PathVariable Long id) {
+        var delivery = plateDeliveryService.getOwnedForDossier(user.getEmail(), id);
+        Resource resource = plateDeliveryService.loadAttachmentResource(delivery);
+        return plateDeliveryService.buildFileResponse(delivery, resource);
     }
 
     @PostMapping("/dossiers/{id}/documents")
@@ -156,6 +168,27 @@ public class CitizenController {
             @AuthenticationPrincipal User user,
             @Valid @RequestBody UpdateProfileRequest request) {
         return ResponseEntity.ok(ApiResponse.ok("Profil mis à jour", profileService.updateProfile(user, request)));
+    }
+
+    @GetMapping("/profile/change-requests")
+    public ResponseEntity<ApiResponse<List<ProfileChangeRequestDto>>> listProfileChangeRequests(
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(ApiResponse.ok(profileChangeRequestService.listForCitizen(user)));
+    }
+
+    @PostMapping(value = "/profile/change-requests", consumes = "multipart/form-data")
+    public ResponseEntity<ApiResponse<ProfileChangeRequestDto>> submitProfileChangeRequest(
+            @AuthenticationPrincipal User user,
+            @RequestParam ProfileChangeField field,
+            @RequestParam String requestedValue,
+            @RequestParam(required = false) Double requestedLatitude,
+            @RequestParam(required = false) Double requestedLongitude,
+            @RequestParam String reason,
+            @RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                "Réclamation enregistrée",
+                profileChangeRequestService.submit(
+                        user, field, requestedValue, requestedLatitude, requestedLongitude, reason, file)));
     }
 
     @PutMapping("/security/password")

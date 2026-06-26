@@ -19,6 +19,8 @@ public class CenterRequest {
 
     private String address;
 
+    private String phone;
+
     @NotNull
     private Double latitude;
 

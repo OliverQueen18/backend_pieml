@@ -18,6 +18,8 @@ public interface DossierRepository extends JpaRepository<Dossier, Long> {
 
     @Query("""
             SELECT DISTINCT d FROM Dossier d
+            LEFT JOIN FETCH d.citizen c
+            LEFT JOIN FETCH c.user
             LEFT JOIN FETCH d.vehicle
             LEFT JOIN FETCH d.documents doc
             LEFT JOIN FETCH doc.typeDocument
@@ -26,6 +28,8 @@ public interface DossierRepository extends JpaRepository<Dossier, Long> {
             LEFT JOIN FETCH a.center
             LEFT JOIN FETCH d.processingCenter
             LEFT JOIN FETCH d.vehicleDeclaration
+            LEFT JOIN FETCH d.plateDelivery
+            LEFT JOIN FETCH d.registration
             WHERE d.id = :id
             """)
     Optional<Dossier> findDetailedById(@Param("id") Long id);
@@ -38,6 +42,7 @@ public interface DossierRepository extends JpaRepository<Dossier, Long> {
             JOIN d.citizen c
             JOIN c.user u
             LEFT JOIN d.vehicle v
+            LEFT JOIN FETCH d.plateDelivery
             WHERE (:status IS NULL OR d.status = :status)
             AND (:referencePattern IS NULL OR LOWER(d.referenceNumber) LIKE :referencePattern)
             AND (:citizenPattern IS NULL OR LOWER(CONCAT(c.firstName, ' ', c.lastName)) LIKE :citizenPattern
@@ -54,7 +59,7 @@ public interface DossierRepository extends JpaRepository<Dossier, Long> {
     @Query("SELECT COUNT(d) FROM Dossier d")
     long countAllDossiers();
 
-    @Query("SELECT COUNT(d) FROM Dossier d WHERE d.status IN ('VALIDATED', 'PAID', 'APPOINTMENT_SCHEDULED', 'COMPLETED')")
+    @Query("SELECT COUNT(d) FROM Dossier d WHERE d.status IN ('VALIDATED', 'PAID', 'APPOINTMENT_SCHEDULED', 'IMMATRICULATION_IN_PROGRESS', 'COMPLETED')")
     long countValidatedDossiers();
 
     @Query("SELECT COUNT(d) FROM Dossier d WHERE d.status = 'COMPLETED'")

@@ -41,6 +41,7 @@ public class AppointmentService {
                             .name(center.getName())
                             .city(center.getCity())
                             .address(center.getAddress())
+                            .phone(center.getPhone())
                             .latitude(center.getLatitude())
                             .longitude(center.getLongitude())
                             .dailyCapacity(center.getDailyCapacity())
@@ -87,13 +88,52 @@ public class AppointmentService {
         appointment.setCenter(center);
         appointment.setAppointmentDate(request.getAppointmentDate());
         appointment.setAppointmentTime(request.getAppointmentTime());
+        appointment.setStatus(AppointmentStatus.SCHEDULED);
+        appointmentRepository.save(appointment);
+
+        User user = dossier.getCitizen().getUser();
+        notificationService.create(user,
+                "Demande de rendez-vous enregistrée au centre " + center.getName()
+                        + " le " + request.getAppointmentDate() + ". En attente de confirmation.",
+                NotificationType.APPOINTMENT, false);
+
+        return mapperService.toDto(dossier);
+    }
+
+    @Transactional
+    public DtoMapper.DossierDto confirmAppointment(Long dossierId, AppointmentRequest request) {
+        Dossier dossier = dossierService.getDossierEntity(dossierId);
+
+        if (dossier.getStatus() != DossierStatus.VALIDATED) {
+            throw new BusinessException("Seuls les dossiers validés peuvent avoir un rendez-vous confirmé");
+        }
+
+        Center center = centerRepository.findById(request.getCenterId())
+                .orElseThrow(() -> new BusinessException("Centre non trouvé", HttpStatus.NOT_FOUND));
+
+        if (!center.isActive()) {
+            throw new BusinessException("Ce centre n'est pas actif");
+        }
+
+        centerScheduleService.validateAppointment(center, request.getAppointmentDate(), request.getAppointmentTime());
+
+        Appointment appointment = dossier.getAppointment();
+        if (appointment == null) {
+            appointment = Appointment.builder().dossier(dossier).build();
+            dossier.setAppointment(appointment);
+        }
+
+        appointment.setCenter(center);
+        appointment.setAppointmentDate(request.getAppointmentDate());
+        appointment.setAppointmentTime(request.getAppointmentTime());
         appointment.setStatus(AppointmentStatus.CONFIRMED);
         appointmentRepository.save(appointment);
 
         dossier.setStatus(DossierStatus.APPOINTMENT_SCHEDULED);
         User user = dossier.getCitizen().getUser();
         notificationService.create(user,
-                "Rendez-vous confirmé au centre " + center.getName() + " le " + request.getAppointmentDate(),
+                "Rendez-vous de contrôle physique confirmé au centre " + center.getName()
+                        + " le " + request.getAppointmentDate(),
                 NotificationType.APPOINTMENT, false);
         emailService.sendAppointmentConvocation(
                 user,

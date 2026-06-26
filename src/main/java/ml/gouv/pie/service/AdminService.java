@@ -171,7 +171,7 @@ public class AdminService {
     }
 
     public DtoMapper.DossierDto getDossier(Long id, User currentUser) {
-        Dossier dossier = dossierRepository.findById(id)
+        Dossier dossier = dossierRepository.findDetailedById(id)
                 .orElseThrow(() -> new BusinessException("Dossier non trouvé", HttpStatus.NOT_FOUND));
         if (!canAccessDossier(resolveUserWithCenters(currentUser), dossier)) {
             throw new BusinessException("Accès non autorisé à ce dossier", HttpStatus.FORBIDDEN);
@@ -188,7 +188,9 @@ public class AdminService {
         Dossier dossier = dossierRepository.findById(id)
                 .orElseThrow(() -> new BusinessException("Dossier non trouvé", HttpStatus.NOT_FOUND));
         if (dossier.getStatus() == DossierStatus.COMPLETED || dossier.getStatus() == DossierStatus.PAID
-                || dossier.getStatus() == DossierStatus.APPOINTMENT_SCHEDULED) {
+                || dossier.getStatus() == DossierStatus.VALIDATED
+                || dossier.getStatus() == DossierStatus.APPOINTMENT_SCHEDULED
+                || dossier.getStatus() == DossierStatus.IMMATRICULATION_IN_PROGRESS) {
             throw new BusinessException("Ce dossier ne peut plus être supprimé");
         }
         dossierRepository.delete(dossier);
@@ -338,6 +340,7 @@ public class AdminService {
                 .name(request.getName().trim())
                 .city(request.getCity().trim())
                 .address(request.getAddress())
+                .phone(blankToNull(request.getPhone()))
                 .latitude(request.getLatitude())
                 .longitude(request.getLongitude())
                 .dailyCapacity(request.getDailyCapacity())
@@ -359,6 +362,7 @@ public class AdminService {
         center.setName(request.getName().trim());
         center.setCity(request.getCity().trim());
         center.setAddress(request.getAddress());
+        center.setPhone(blankToNull(request.getPhone()));
         center.setLatitude(request.getLatitude());
         center.setLongitude(request.getLongitude());
         center.setDailyCapacity(request.getDailyCapacity());
@@ -397,23 +401,37 @@ public class AdminService {
         Citizen citizen = dossier.getCitizen();
         String vehicleLabel = null;
         String chassisNumber = null;
+        String plateNumber = null;
         if (dossier.getVehicle() != null) {
             Vehicle v = dossier.getVehicle();
             vehicleLabel = v.getBrand() + " " + v.getModel();
             chassisNumber = v.getChassisNumber();
+            if (v.getRegistrationNumber() != null && !v.getRegistrationNumber().isBlank()) {
+                plateNumber = v.getRegistrationNumber();
+            }
+        }
+        if (dossier.getPlateDelivery() != null
+                && dossier.getPlateDelivery().getPlateNumber() != null
+                && !dossier.getPlateDelivery().getPlateNumber().isBlank()) {
+            plateNumber = dossier.getPlateDelivery().getPlateNumber();
         }
         int requiredDocuments = dossier.getDocuments().size();
         int uploadedDocuments = (int) dossier.getDocuments().stream()
                 .filter(d -> d.getFileName() != null && !d.getFileName().isBlank())
                 .count();
         String centerName = null;
+        Long centerId = null;
         java.time.LocalDate appointmentDate = null;
         java.time.LocalTime appointmentTime = null;
         if (dossier.getAppointment() != null) {
             Appointment appointment = dossier.getAppointment();
+            centerId = appointment.getCenter().getId();
             centerName = appointment.getCenter().getName();
             appointmentDate = appointment.getAppointmentDate();
             appointmentTime = appointment.getAppointmentTime();
+        } else if (dossier.getProcessingCenter() != null) {
+            centerId = dossier.getProcessingCenter().getId();
+            centerName = dossier.getProcessingCenter().getName();
         }
         return DtoMapper.AdminDossierSummaryDto.builder()
                 .id(dossier.getId())
@@ -423,8 +441,10 @@ public class AdminService {
                 .citizenEmail(citizen.getUser().getEmail())
                 .vehicleLabel(vehicleLabel)
                 .chassisNumber(chassisNumber)
+                .plateNumber(plateNumber)
                 .uploadedDocuments(uploadedDocuments)
                 .requiredDocuments(requiredDocuments)
+                .centerId(centerId)
                 .centerName(centerName)
                 .appointmentDate(appointmentDate)
                 .appointmentTime(appointmentTime)
@@ -449,15 +469,29 @@ public class AdminService {
             return true;
         }
         Set<Long> centerIds = user.getCenters().stream().map(Center::getId).collect(Collectors.toSet());
-        if (role == Role.VALIDATEUR
-                && (dossier.getStatus() == DossierStatus.SUBMITTED
-                || dossier.getStatus() == DossierStatus.IN_REVIEW)) {
+        if (role == Role.VALIDATEUR && isTreatmentStatus(dossier.getStatus())) {
+            if (centerIds.isEmpty()) {
+                return true;
+            }
+            if (dossier.getAppointment() != null) {
+                return centerIds.contains(dossier.getAppointment().getCenter().getId());
+            }
+            if (dossier.getProcessingCenter() != null) {
+                return centerIds.contains(dossier.getProcessingCenter().getId());
+            }
             return true;
         }
         if (dossier.getAppointment() != null && !centerIds.isEmpty()) {
             return centerIds.contains(dossier.getAppointment().getCenter().getId());
         }
         return false;
+    }
+
+    private boolean isTreatmentStatus(DossierStatus status) {
+        return status == DossierStatus.PAID
+                || status == DossierStatus.VALIDATED
+                || status == DossierStatus.APPOINTMENT_SCHEDULED
+                || status == DossierStatus.IMMATRICULATION_IN_PROGRESS;
     }
 
     private void validateAssignableCenters(User actor, List<Long> centerIds) {
@@ -544,6 +578,7 @@ public class AdminService {
                 .name(center.getName())
                 .city(center.getCity())
                 .address(center.getAddress())
+                .phone(center.getPhone())
                 .latitude(center.getLatitude())
                 .longitude(center.getLongitude())
                 .dailyCapacity(center.getDailyCapacity())
@@ -805,12 +840,22 @@ public class AdminService {
     private DtoMapper.AdminPaymentDto toPaymentDto(Payment payment) {
         Dossier dossier = payment.getDossier();
         Citizen citizen = dossier.getCitizen();
+        Center center = dossier.getProcessingCenter();
+        Vehicle vehicle = dossier.getVehicle();
+        VehicleType vehicleType = vehicle != null ? vehicle.getVehicleTypeEntity() : null;
+        String vehicleTypeLabel = vehicleType != null
+                ? vehicleType.getLibelle()
+                : (vehicle != null ? vehicle.getVehicleType() : null);
         return DtoMapper.AdminPaymentDto.builder()
                 .id(payment.getId())
                 .dossierId(dossier.getId())
                 .dossierReference(dossier.getReferenceNumber())
                 .citizenName(citizen.getFirstName() + " " + citizen.getLastName())
                 .citizenEmail(citizen.getUser().getEmail())
+                .centerId(center != null ? center.getId() : null)
+                .centerName(center != null ? center.getName() : null)
+                .vehicleTypeId(vehicleType != null ? vehicleType.getId() : null)
+                .vehicleTypeLabel(vehicleTypeLabel)
                 .amount(payment.getAmount())
                 .serviceFee(payment.getServiceFee())
                 .totalAmount(payment.getTotalAmount())

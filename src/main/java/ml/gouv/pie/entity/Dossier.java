@@ -57,6 +57,9 @@ public class Dossier {
     @OneToOne(mappedBy = "dossier", cascade = CascadeType.ALL, orphanRemoval = true)
     private VehicleDeclaration vehicleDeclaration;
 
+    @OneToOne(mappedBy = "dossier", cascade = CascadeType.ALL, orphanRemoval = true)
+    private PlateDelivery plateDelivery;
+
     @Column(updatable = false)
     private LocalDateTime createdAt;
 

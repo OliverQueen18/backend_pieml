@@ -3,18 +3,54 @@ services:
     image: postgres:16-alpine
     container_name: pieml-postgres
     environment:
-      POSTGRES_DB: pieml
-      POSTGRES_USER: pieml
-      POSTGRES_PASSWORD: pieml123
+      POSTGRES_DB: ${DB_NAME:-bd_pieml}
+      POSTGRES_USER: ${DB_USER:-oservices}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-Services@2025*!}
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5433}:5432"
     volumes:
       - pieml_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pieml -d pieml"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-oservices} -d ${DB_NAME:-bd_pieml}"]
       interval: 5s
       timeout: 5s
       retries: 5
 
+  backend:
+    build: .
+    image: pieml-backend:local
+    container_name: pieml-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: 7000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-bd_pieml}
+      DB_USER: ${DB_USER:-oservices}
+      DB_PASSWORD: ${DB_PASSWORD:-Services@2025*!}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      MAIL_ENABLED: ${MAIL_ENABLED:-false}
+    ports:
+      - "7000:7000"
+    volumes:
+      - pieml_uploads:/app/uploads
+
+  frontend:
+    build: ../frontend_pieml
+    image: pieml-frontend:local
+    container_name: pieml-frontend
+    depends_on:
+      - backend
+    environment:
+      BACKEND_HOST: backend
+      BACKEND_PORT: 7000
+    ports:
+      - "80:80"
+
 volumes:
   pieml_pgdata:
+  pieml_uploads:

@@ -45,6 +45,7 @@ public class DtoMapper {
         private String color;
         private Integer year;
         private String countryOfOrigin;
+        private String registrationNumber;
     }
 
     @Data
@@ -88,6 +89,11 @@ public class DtoMapper {
         private PaymentStatus status;
         private PaymentMethod paymentMethod;
         private LocalDateTime paymentDate;
+        private Long centerId;
+        private String centerName;
+        private String centerCity;
+        private Long vehicleTypeId;
+        private String vehicleTypeLabel;
     }
 
     @Data
@@ -135,17 +141,54 @@ public class DtoMapper {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    public static class PlateDeliveryDto {
+        private Long id;
+        private String plateNumber;
+        private LocalDate deliveryDate;
+        private String collectorFirstName;
+        private String collectorLastName;
+        private String collectorPhone;
+        private String collectorAddress;
+        private String fileName;
+        private Long fileSize;
+        private String contentType;
+        private LocalDateTime createdAt;
+        private LocalDateTime updatedAt;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class DossierCitizenDto {
+        private Long id;
+        private String firstName;
+        private String lastName;
+        private String email;
+        private String phone;
+        private String nina;
+        private String address;
+        private Double latitude;
+        private Double longitude;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class DossierDto {
         private Long id;
         private String referenceNumber;
         private DossierStatus status;
         private String rejectionReason;
+        private DossierCitizenDto citizen;
         private VehicleDto vehicle;
         private List<DocumentDto> documents;
         private PaymentDto payment;
         private AppointmentDto appointment;
         private ProcessingCenterDto processingCenter;
         private VehicleDeclarationDto vehicleDeclaration;
+        private PlateDeliveryDto plateDelivery;
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
     }
@@ -186,6 +229,7 @@ public class DtoMapper {
         private String name;
         private String city;
         private String address;
+        private String phone;
         private Double latitude;
         private Double longitude;
         private int dailyCapacity;
@@ -266,8 +310,10 @@ public class DtoMapper {
         private String citizenEmail;
         private String vehicleLabel;
         private String chassisNumber;
+        private String plateNumber;
         private int uploadedDocuments;
         private int requiredDocuments;
+        private Long centerId;
         private String centerName;
         private java.time.LocalDate appointmentDate;
         private java.time.LocalTime appointmentTime;
@@ -363,6 +409,10 @@ public class DtoMapper {
         private String dossierReference;
         private String citizenName;
         private String citizenEmail;
+        private Long centerId;
+        private String centerName;
+        private Long vehicleTypeId;
+        private String vehicleTypeLabel;
         private BigDecimal amount;
         private BigDecimal serviceFee;
         private BigDecimal totalAmount;

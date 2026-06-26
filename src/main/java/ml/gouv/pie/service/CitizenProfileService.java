@@ -33,32 +33,10 @@ public class CitizenProfileService {
 
     @Transactional
     public CitizenProfileDto updateProfile(User authUser, UpdateProfileRequest request) {
-        User user = loadUser(authUser.getEmail());
-        Citizen citizen = loadCitizen(user.getEmail());
-
-        String newEmail = request.getEmail().trim().toLowerCase();
-        String newPhone = request.getPhone().trim();
-
-        if (!user.getEmail().equalsIgnoreCase(newEmail) && userRepository.existsByEmail(newEmail)) {
-            throw new BusinessException("Cet email est déjà utilisé");
-        }
-        if (!user.getPhone().equals(newPhone) && userRepository.existsByPhone(newPhone)) {
-            throw new BusinessException("Ce numéro de téléphone est déjà utilisé");
-        }
-
-        citizen.setFirstName(request.getFirstName().trim().toUpperCase());
-        citizen.setLastName(request.getLastName().trim().toUpperCase());
-        citizen.setAddress(request.getAddress().trim());
-        citizen.setLatitude(request.getLatitude());
-        citizen.setLongitude(request.getLongitude());
-
-        boolean emailChanged = !user.getEmail().equalsIgnoreCase(newEmail);
-        user.setEmail(newEmail);
-        user.setPhone(newPhone);
-        userRepository.save(user);
-
-        String token = emailChanged ? jwtService.generateToken(user) : null;
-        return toDto(user, citizen, token);
+        throw new BusinessException(
+                "La modification directe du profil n'est plus autorisée. "
+                        + "Soumettez une réclamation avec pièce justificative depuis votre espace citoyen.",
+                HttpStatus.FORBIDDEN);
     }
 
     @Transactional

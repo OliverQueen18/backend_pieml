@@ -189,7 +189,7 @@ public class EmailService {
                   <p>%s,</p>
                   <p>%s</p>
                   <p style="margin-top:24px">
-                    <a href="http://localhost:4200/tableau-de-bord"
+                    <a href="%s/tableau-de-bord"
                        style="background:#2ecc71;color:white;padding:12px 24px;text-decoration:none;border-radius:6px">
                       Accéder à mon espace
                     </a>
@@ -197,7 +197,7 @@ public class EmailService {
                   <hr style="border:none;border-top:1px solid #eee;margin:24px 0">
                   <p style="color:#888;font-size:12px">Cet email a été envoyé automatiquement, merci de ne pas répondre.</p>
                 </div>
-                """.formatted(greeting, message);
+                """.formatted(greeting, message, frontendUrl);
 
         sendHtml(user.getEmail(), subject, html);
     }
@@ -231,11 +231,24 @@ public class EmailService {
 
     @Async
     public void sendPaymentReceipt(User user, String referenceNumber, String transactionId,
-                                   String amount, String paymentDate) {
+                                   String amount, String paymentDate, String centerLabel,
+                                   String vehicleTypeLabel) {
         if (!mailEnabled) return;
 
         String greeting = resolveGreeting(user);
         String subject = "PIE ML — Reçu de paiement (" + referenceNumber + ")";
+        String centerRow = centerLabel != null && !centerLabel.isBlank()
+                ? """
+                    <tr><td style="padding:8px;border-bottom:1px solid #eee">Centre</td>
+                        <td style="padding:8px;border-bottom:1px solid #eee">%s</td></tr>
+                    """.formatted(centerLabel)
+                : "";
+        String vehicleTypeRow = vehicleTypeLabel != null && !vehicleTypeLabel.isBlank()
+                ? """
+                    <tr><td style="padding:8px;border-bottom:1px solid #eee">Type d'engin</td>
+                        <td style="padding:8px;border-bottom:1px solid #eee">%s</td></tr>
+                    """.formatted(vehicleTypeLabel)
+                : "";
         String html = """
                 <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
                   <h2 style="color:#1e3a5f">Reçu de paiement</h2>
@@ -246,7 +259,7 @@ public class EmailService {
                         <td style="padding:8px;border-bottom:1px solid #eee"><strong>%s</strong></td></tr>
                     <tr><td style="padding:8px;border-bottom:1px solid #eee">Transaction</td>
                         <td style="padding:8px;border-bottom:1px solid #eee">%s</td></tr>
-                    <tr><td style="padding:8px;border-bottom:1px solid #eee">Montant</td>
+                    %s%s<tr><td style="padding:8px;border-bottom:1px solid #eee">Montant</td>
                         <td style="padding:8px;border-bottom:1px solid #eee"><strong>%s FCFA</strong></td></tr>
                     <tr><td style="padding:8px">Date</td>
                         <td style="padding:8px">%s</td></tr>
@@ -254,7 +267,7 @@ public class EmailService {
                   <hr style="border:none;border-top:1px solid #eee;margin:24px 0">
                   <p style="color:#888;font-size:12px">Trésor Pay — PIE ML</p>
                 </div>
-                """.formatted(greeting, referenceNumber, transactionId, amount, paymentDate);
+                """.formatted(greeting, referenceNumber, transactionId, centerRow, vehicleTypeRow, amount, paymentDate);
 
         sendHtml(user.getEmail(), subject, html);
     }

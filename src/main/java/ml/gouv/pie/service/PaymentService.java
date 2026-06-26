@@ -38,8 +38,10 @@ public class PaymentService {
     public DtoMapper.DossierDto initiatePayment(String email, Long dossierId, PaymentRequest request) {
         Dossier dossier = dossierService.getOwnedDossier(email, dossierId);
 
-        if (dossier.getStatus() != DossierStatus.VALIDATED && dossier.getStatus() != DossierStatus.PAYMENT_PENDING) {
-            throw new BusinessException("Le dossier doit être validé avant le paiement");
+        if (dossier.getStatus() != DossierStatus.SUBMITTED
+                && dossier.getStatus() != DossierStatus.PAYMENT_PENDING
+                && dossier.getStatus() != DossierStatus.VALIDATED) {
+            throw new BusinessException("Le dossier doit être soumis avant le paiement");
         }
 
         Center center = centerRepository.findById(request.getCenterId())
@@ -91,15 +93,23 @@ public class PaymentService {
         notificationService.create(user,
                 "Paiement confirmé pour le dossier " + dossier.getReferenceNumber(),
                 NotificationType.PAYMENT, false);
+        Center center = dossier.getProcessingCenter();
+        String centerLabel = center != null ? center.getCity() + " — " + center.getName() : null;
+        String vehicleTypeLabel = null;
+        if (dossier.getVehicle() != null) {
+            var vt = dossier.getVehicle().getVehicleTypeEntity();
+            vehicleTypeLabel = vt != null ? vt.getLibelle() : dossier.getVehicle().getVehicleType();
+        }
         emailService.sendPaymentReceipt(
                 user,
                 dossier.getReferenceNumber(),
                 payment.getTransactionId(),
                 payment.getTotalAmount().toPlainString(),
-                payment.getPaymentDate().toString()
+                payment.getPaymentDate().toString(),
+                centerLabel,
+                vehicleTypeLabel
         );
 
-        Center center = dossier.getProcessingCenter();
         if (center != null) {
             var staff = userRepository.findActiveStaffByCenterId(center.getId());
             emailService.sendCenterNewDossierNotification(staff, dossier, center);

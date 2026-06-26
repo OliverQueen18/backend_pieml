@@ -16,6 +16,9 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             JOIN FETCH p.dossier d
             JOIN FETCH d.citizen c
             JOIN FETCH c.user
+            LEFT JOIN FETCH d.processingCenter
+            LEFT JOIN FETCH d.vehicle v
+            LEFT JOIN FETCH v.vehicleTypeEntity
             ORDER BY p.id DESC
             """)
     List<Payment> findAllWithDossierOrderByIdDesc();
@@ -25,6 +28,9 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             JOIN FETCH p.dossier d
             JOIN FETCH d.citizen c
             JOIN FETCH c.user
+            LEFT JOIN FETCH d.processingCenter
+            LEFT JOIN FETCH d.vehicle v
+            LEFT JOIN FETCH v.vehicleTypeEntity
             WHERE p.id = :id
             """)
     Optional<Payment> findByIdWithDossier(Long id);

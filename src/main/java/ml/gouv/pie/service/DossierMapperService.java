@@ -31,6 +31,7 @@ public class DossierMapperService {
                     .color(v.getColor())
                     .year(v.getYear())
                     .countryOfOrigin(v.getCountryOfOrigin())
+                    .registrationNumber(v.getRegistrationNumber())
                     .build();
         }
 
@@ -50,6 +51,12 @@ public class DossierMapperService {
         DtoMapper.PaymentDto paymentDto = null;
         if (dossier.getPayment() != null) {
             Payment p = dossier.getPayment();
+            Center paymentCenter = dossier.getProcessingCenter();
+            Vehicle paymentVehicle = dossier.getVehicle();
+            VehicleType paymentVehicleType = paymentVehicle != null ? paymentVehicle.getVehicleTypeEntity() : null;
+            String paymentVehicleTypeLabel = paymentVehicleType != null
+                    ? paymentVehicleType.getLibelle()
+                    : (paymentVehicle != null ? paymentVehicle.getVehicleType() : null);
             paymentDto = DtoMapper.PaymentDto.builder()
                     .id(p.getId())
                     .amount(p.getAmount())
@@ -59,6 +66,11 @@ public class DossierMapperService {
                     .status(p.getStatus())
                     .paymentMethod(p.getPaymentMethod())
                     .paymentDate(p.getPaymentDate())
+                    .centerId(paymentCenter != null ? paymentCenter.getId() : null)
+                    .centerName(paymentCenter != null ? paymentCenter.getName() : null)
+                    .centerCity(paymentCenter != null ? paymentCenter.getCity() : null)
+                    .vehicleTypeId(paymentVehicleType != null ? paymentVehicleType.getId() : null)
+                    .vehicleTypeLabel(paymentVehicleTypeLabel)
                     .build();
         }
 
@@ -103,17 +115,55 @@ public class DossierMapperService {
                     .build();
         }
 
+        DtoMapper.PlateDeliveryDto plateDeliveryDto = null;
+        if (dossier.getPlateDelivery() != null) {
+            PlateDelivery plateDelivery = dossier.getPlateDelivery();
+            plateDeliveryDto = DtoMapper.PlateDeliveryDto.builder()
+                    .id(plateDelivery.getId())
+                    .plateNumber(plateDelivery.getPlateNumber())
+                    .deliveryDate(plateDelivery.getDeliveryDate())
+                    .collectorFirstName(plateDelivery.getCollectorFirstName())
+                    .collectorLastName(plateDelivery.getCollectorLastName())
+                    .collectorPhone(plateDelivery.getCollectorPhone())
+                    .collectorAddress(plateDelivery.getCollectorAddress())
+                    .fileName(plateDelivery.getFileName())
+                    .fileSize(plateDelivery.getFileSize())
+                    .contentType(plateDelivery.getContentType())
+                    .createdAt(plateDelivery.getCreatedAt())
+                    .updatedAt(plateDelivery.getUpdatedAt())
+                    .build();
+        }
+
+        DtoMapper.DossierCitizenDto citizenDto = null;
+        if (dossier.getCitizen() != null) {
+            Citizen citizen = dossier.getCitizen();
+            User user = citizen.getUser();
+            citizenDto = DtoMapper.DossierCitizenDto.builder()
+                    .id(citizen.getId())
+                    .firstName(citizen.getFirstName())
+                    .lastName(citizen.getLastName())
+                    .email(user != null ? user.getEmail() : null)
+                    .phone(user != null ? user.getPhone() : null)
+                    .nina(citizen.getNina())
+                    .address(citizen.getAddress())
+                    .latitude(citizen.getLatitude())
+                    .longitude(citizen.getLongitude())
+                    .build();
+        }
+
         return DtoMapper.DossierDto.builder()
                 .id(dossier.getId())
                 .referenceNumber(dossier.getReferenceNumber())
                 .status(dossier.getStatus())
                 .rejectionReason(dossier.getRejectionReason())
+                .citizen(citizenDto)
                 .vehicle(vehicleDto)
                 .documents(docDtos)
                 .payment(paymentDto)
                 .appointment(appointmentDto)
                 .processingCenter(processingCenterDto)
                 .vehicleDeclaration(declarationDto)
+                .plateDelivery(plateDeliveryDto)
                 .createdAt(dossier.getCreatedAt())
                 .updatedAt(dossier.getUpdatedAt())
                 .build();

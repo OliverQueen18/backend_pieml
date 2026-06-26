@@ -9,6 +9,7 @@ public enum DossierStatus {
     PAYMENT_PENDING,
     PAID,
     APPOINTMENT_SCHEDULED,
+    IMMATRICULATION_IN_PROGRESS,
     COMPLETED,
     STOLEN,
     LOST,
