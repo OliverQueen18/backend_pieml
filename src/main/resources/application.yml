@@ -46,7 +46,7 @@ app:
     secret: ${JWT_SECRET:PIEML-Super-Secret-Key-For-JWT-Token-Generation-2024-Mali}
     expiration-ms: 86400000
   cors:
-    allowed-origins: ${CORS_ORIGINS:http://localhost:4200}
+    allowed-origins: ${CORS_ORIGINS:http://localhost:4200,https://e-pie.ml,http://e-pie.ml,https://www.e-pie.ml,http://www.e-pie.ml}
   upload:
     dir: ${UPLOAD_DIR:./uploads}
   payment:

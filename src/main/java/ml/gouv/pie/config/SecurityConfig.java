@@ -39,6 +39,9 @@ public class SecurityConfig {
     @Value("${app.cors.allowed-origins}")
     private String allowedOrigins;
 
+    @Value("${app.frontend.url:}")
+    private String frontendUrl;
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
@@ -67,10 +70,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(Arrays.stream(allowedOrigins.split(","))
-                .map(String::trim)
-                .filter(origin -> !origin.isEmpty())
-                .toList());
+        config.setAllowedOrigins(buildAllowedOrigins());
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
@@ -79,6 +79,36 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return source;
+    }
+
+    private List<String> buildAllowedOrigins() {
+        java.util.LinkedHashSet<String> origins = new java.util.LinkedHashSet<>();
+        addOriginCsv(origins, allowedOrigins);
+        addOriginVariants(origins, frontendUrl);
+        return List.copyOf(origins);
+    }
+
+    private void addOriginCsv(java.util.Set<String> origins, String csv) {
+        if (csv == null || csv.isBlank()) {
+            return;
+        }
+        Arrays.stream(csv.split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isEmpty())
+                .forEach(origins::add);
+    }
+
+    private void addOriginVariants(java.util.Set<String> origins, String url) {
+        if (url == null || url.isBlank()) {
+            return;
+        }
+        String base = url.trim().replaceAll("/+$", "");
+        origins.add(base);
+        if (base.startsWith("https://")) {
+            origins.add("http://" + base.substring(8));
+        } else if (base.startsWith("http://")) {
+            origins.add("https://" + base.substring(7));
+        }
     }
 
     @Bean

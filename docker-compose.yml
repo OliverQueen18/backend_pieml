@@ -30,8 +30,8 @@ services:
       DB_NAME: ${DB_NAME:-bd_pieml}
       DB_USER: ${DB_USER:-oservices}
       DB_PASSWORD: ${DB_PASSWORD:-Services@2025*!}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://e-pie.ml,http://e-pie.ml,https://www.e-pie.ml,http://www.e-pie.ml}
+      FRONTEND_URL: ${FRONTEND_URL:-https://e-pie.ml}
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       MAIL_ENABLED: ${MAIL_ENABLED:-false}
     ports:
