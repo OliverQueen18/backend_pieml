@@ -9,6 +9,9 @@ import java.util.List;
 @Data
 public class UpdateStaffUserRequest {
     private String phone;
+    private String firstName;
+    private String lastName;
+    private String address;
     private Role role;
     private Boolean enabled;
 

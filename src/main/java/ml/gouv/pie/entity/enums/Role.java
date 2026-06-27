@@ -5,5 +5,7 @@ public enum Role {
     ADMIN,
     VALIDATEUR,
     IMMATRICULATEUR,
+    UTILISATEUR,
+    PUBLIC,
     CITOYEN
 }

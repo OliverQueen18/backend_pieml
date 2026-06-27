@@ -213,6 +213,7 @@ public class AdminService {
         if (request.getRole() == Role.CITOYEN) {
             throw new BusinessException("Utilisez l'inscription publique pour les citoyens");
         }
+        validateCreatableRole(actor, request.getRole());
         validateAssignableCenters(actor, request.getCenterIds());
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new BusinessException("Cet email est déjà utilisé");
@@ -224,6 +225,9 @@ public class AdminService {
         User user = User.builder()
                 .email(request.getEmail().trim().toLowerCase())
                 .phone(request.getPhone().trim())
+                .firstName(request.getFirstName().trim())
+                .lastName(request.getLastName().trim())
+                .address(blankToNull(request.getAddress()))
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(request.getRole())
                 .enabled(true)
@@ -248,10 +252,20 @@ public class AdminService {
         if (request.getPhone() != null && !request.getPhone().isBlank()) {
             user.setPhone(request.getPhone().trim());
         }
+        if (request.getFirstName() != null && !request.getFirstName().isBlank()) {
+            user.setFirstName(request.getFirstName().trim());
+        }
+        if (request.getLastName() != null && !request.getLastName().isBlank()) {
+            user.setLastName(request.getLastName().trim());
+        }
+        if (request.getAddress() != null) {
+            user.setAddress(blankToNull(request.getAddress()));
+        }
         if (request.getRole() != null) {
             if (request.getRole() == Role.CITOYEN) {
                 throw new BusinessException("Impossible de convertir en citoyen via cette interface");
             }
+            validateCreatableRole(actor, request.getRole());
             user.setRole(request.getRole());
         }
         if (request.getEnabled() != null) {
@@ -540,12 +554,30 @@ public class AdminService {
                 .role(user.getRole())
                 .enabled(user.isEnabled())
                 .firstName(citizen != null ? citizen.getFirstName() : staffFirstName(user))
-                .lastName(citizen != null ? citizen.getLastName() : "")
+                .lastName(citizen != null ? citizen.getLastName() : staffLastName(user))
+                .address(citizen != null ? citizen.getAddress() : user.getAddress())
                 .createdAt(user.getCreatedAt())
                 .mustChangePassword(user.isMustChangePassword())
                 .centerIds(centerIds)
                 .centerNames(centerNames)
                 .build();
+    }
+
+    private void validateCreatableRole(User actor, Role targetRole) {
+        if (actor.getRole() == Role.SUPER_ADMIN) {
+            return;
+        }
+        if (actor.getRole() == Role.ADMIN) {
+            if (targetRole == Role.SUPER_ADMIN || targetRole == Role.ADMIN) {
+                throw new BusinessException("Un gestionnaire de centre ne peut pas créer ce type de compte", HttpStatus.FORBIDDEN);
+            }
+            if (targetRole == Role.PUBLIC || targetRole == Role.VALIDATEUR
+                    || targetRole == Role.IMMATRICULATEUR || targetRole == Role.UTILISATEUR) {
+                return;
+            }
+            throw new BusinessException("Rôle non autorisé pour un gestionnaire de centre", HttpStatus.FORBIDDEN);
+        }
+        throw new BusinessException("Permission insuffisante pour créer un compte staff", HttpStatus.FORBIDDEN);
     }
 
     private void applyCenters(User user, List<Long> centerIds) {
@@ -566,10 +598,20 @@ public class AdminService {
     }
 
     private String staffFirstName(User user) {
+        if (user.getFirstName() != null && !user.getFirstName().isBlank()) {
+            return user.getFirstName().trim();
+        }
         String local = user.getEmail().substring(0, user.getEmail().indexOf('@'));
         local = local.replace('.', ' ').replace('_', ' ');
         if (local.isEmpty()) return "Utilisateur";
         return local.substring(0, 1).toUpperCase() + local.substring(1);
+    }
+
+    private String staffLastName(User user) {
+        if (user.getLastName() != null && !user.getLastName().isBlank()) {
+            return user.getLastName().trim();
+        }
+        return "";
     }
 
     private DtoMapper.CenterDto toCenterDto(Center center) {

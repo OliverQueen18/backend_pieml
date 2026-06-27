@@ -333,6 +333,7 @@ public class DtoMapper {
         private boolean enabled;
         private String firstName;
         private String lastName;
+        private String address;
         private LocalDateTime createdAt;
         private boolean mustChangePassword;
         private List<Long> centerIds;

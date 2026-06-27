@@ -13,7 +13,22 @@ public final class DefaultRolePermissions {
 
     public static Set<Permission> forRole(Role role) {
         return switch (role) {
-            case SUPER_ADMIN, ADMIN -> EnumSet.allOf(Permission.class);
+            case SUPER_ADMIN -> EnumSet.allOf(Permission.class);
+            case ADMIN -> EnumSet.of(
+                    Permission.ADMIN_DASHBOARD_VIEW,
+                    Permission.DOSSIERS_VIEW,
+                    Permission.DOSSIERS_VALIDATE,
+                    Permission.DOSSIERS_REJECT,
+                    Permission.CITIZENS_VIEW,
+                    Permission.CITIZENS_MANAGE,
+                    Permission.USERS_VIEW,
+                    Permission.USERS_MANAGE,
+                    Permission.CENTERS_VIEW,
+                    Permission.NOTIFICATIONS_VIEW,
+                    Permission.PAYMENTS_VIEW,
+                    Permission.APPOINTMENTS_MANAGE,
+                    Permission.IMMATRICULATION_PROCESS
+            );
             case VALIDATEUR -> EnumSet.of(
                     Permission.ADMIN_DASHBOARD_VIEW,
                     Permission.DOSSIERS_VIEW,
@@ -27,6 +42,16 @@ public final class DefaultRolePermissions {
                     Permission.CITIZENS_VIEW,
                     Permission.APPOINTMENTS_MANAGE,
                     Permission.IMMATRICULATION_PROCESS
+            );
+            case UTILISATEUR -> EnumSet.of(
+                    Permission.ADMIN_DASHBOARD_VIEW,
+                    Permission.DOSSIERS_VIEW,
+                    Permission.CITIZENS_VIEW,
+                    Permission.NOTIFICATIONS_VIEW
+            );
+            case PUBLIC -> EnumSet.of(
+                    Permission.ADMIN_DASHBOARD_VIEW,
+                    Permission.PAYMENTS_VIEW
             );
             case CITOYEN -> EnumSet.noneOf(Permission.class);
         };

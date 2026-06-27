@@ -17,6 +17,14 @@ public class CreateStaffUserRequest {
     @NotBlank
     private String phone;
 
+    @NotBlank
+    private String firstName;
+
+    @NotBlank
+    private String lastName;
+
+    private String address;
+
     @NotBlank @Size(min = 8)
     private String password;
 

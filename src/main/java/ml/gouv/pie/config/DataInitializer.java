@@ -188,8 +188,8 @@ public class DataInitializer {
                     roleDef(Role.SUPER_ADMIN, "Super administrateur",
                             "Accès complet à la plateforme et à la configuration système", true,
                             DefaultRolePermissions.forRole(Role.SUPER_ADMIN)),
-                    roleDef(Role.ADMIN, "Administrateur",
-                            "Gestion des utilisateurs, centres et paramètres", true,
+                    roleDef(Role.ADMIN, "Gestionnaire de Centre",
+                            "Gère un centre et peut créer des comptes Public, validateurs et immatriculateurs", true,
                             DefaultRolePermissions.forRole(Role.ADMIN)),
                     roleDef(Role.VALIDATEUR, "Validateur",
                             "Validation et rejet des dossiers d'immatriculation", true,
@@ -197,24 +197,54 @@ public class DataInitializer {
                     roleDef(Role.IMMATRICULATEUR, "Immatriculateur",
                             "Traitement des rendez-vous et immatriculations sur site", true,
                             DefaultRolePermissions.forRole(Role.IMMATRICULATEUR)),
+                    roleDef(Role.UTILISATEUR, "Utilisateur",
+                            "Consultation opérationnelle : dossiers, citoyens et notifications", true,
+                            DefaultRolePermissions.forRole(Role.UTILISATEUR)),
+                    roleDef(Role.PUBLIC, "Public",
+                            "Visualisation des statistiques uniquement", true,
+                            DefaultRolePermissions.forRole(Role.PUBLIC)),
                     roleDef(Role.CITOYEN, "Citoyen",
                             "Dépôt et suivi des demandes d'immatriculation", true,
                             DefaultRolePermissions.forRole(Role.CITOYEN))
             ));
         }
         seedMissingRolePermissions();
+        syncRoleCatalog();
         syncAdminPermissions();
     }
 
     private void syncAdminPermissions() {
         EnumSet<Permission> allPermissions = EnumSet.allOf(Permission.class);
         for (RoleDefinition role : roleDefinitionRepository.findAll()) {
-            if ((role.getCode() == Role.SUPER_ADMIN || role.getCode() == Role.ADMIN)
+            if (role.getCode() == Role.SUPER_ADMIN
                     && (role.getPermissions() == null || !role.getPermissions().containsAll(allPermissions))) {
                 role.setPermissions(EnumSet.copyOf(allPermissions));
                 roleDefinitionRepository.save(role);
             }
         }
+    }
+
+    private void syncRoleCatalog() {
+        upsertRoleDefinition(Role.ADMIN, "Gestionnaire de Centre",
+                "Gère un centre et peut créer des comptes Public, validateurs et immatriculateurs",
+                DefaultRolePermissions.forRole(Role.ADMIN));
+        upsertRoleDefinition(Role.UTILISATEUR, "Utilisateur",
+                "Consultation opérationnelle : dossiers, citoyens et notifications",
+                DefaultRolePermissions.forRole(Role.UTILISATEUR));
+        upsertRoleDefinition(Role.PUBLIC, "Public",
+                "Visualisation des statistiques uniquement",
+                DefaultRolePermissions.forRole(Role.PUBLIC));
+    }
+
+    private void upsertRoleDefinition(Role code, String label, String description, Set<Permission> permissions) {
+        roleDefinitionRepository.findByCode(code).ifPresentOrElse(role -> {
+            role.setLabel(label);
+            role.setDescription(description);
+            if (role.getPermissions() == null || role.getPermissions().isEmpty()) {
+                role.setPermissions(EnumSet.copyOf(permissions));
+            }
+            roleDefinitionRepository.save(role);
+        }, () -> roleDefinitionRepository.save(roleDef(code, label, description, true, permissions)));
     }
 
     private void seedMissingRolePermissions() {

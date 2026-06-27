@@ -56,7 +56,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/citizen/track", "/api/citizen/track/**").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/citizen/**").hasRole("CITOYEN")
-                        .requestMatchers("/api/admin/**").hasAnyRole("SUPER_ADMIN", "ADMIN", "VALIDATEUR", "IMMATRICULATEUR")
+                        .requestMatchers("/api/admin/**").hasAnyRole("SUPER_ADMIN", "ADMIN", "VALIDATEUR", "IMMATRICULATEUR", "UTILISATEUR", "PUBLIC")
                         .requestMatchers("/api/validateur/**").hasAnyRole("VALIDATEUR", "ADMIN", "SUPER_ADMIN")
                         .requestMatchers("/api/immatriculateur/**").hasAnyRole("IMMATRICULATEUR", "ADMIN", "SUPER_ADMIN")
                         .anyRequest().authenticated()
