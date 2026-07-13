@@ -228,14 +228,14 @@ public class AdminController {
     }
 
     @GetMapping("/profile-change-requests")
-    @PreAuthorize("hasAnyRole('VALIDATEUR', 'ADMIN', 'SUPER_ADMIN', 'IMMATRICULATEUR')")
+    @PreAuthorize("hasAnyRole('VALIDATEUR', 'ADMIN', 'SUPER_ADMIN', 'IMMATRICULATEUR', 'AUDIT', 'UTILISATEUR')")
     public ResponseEntity<ApiResponse<List<AdminProfileChangeRequestDto>>> listProfileChangeRequests(
             @RequestParam(required = false) ProfileChangeRequestStatus status) {
         return ResponseEntity.ok(ApiResponse.ok(profileChangeRequestService.listForAdmin(status)));
     }
 
     @GetMapping("/profile-change-requests/pending-count")
-    @PreAuthorize("hasAnyRole('VALIDATEUR', 'ADMIN', 'SUPER_ADMIN', 'IMMATRICULATEUR')")
+    @PreAuthorize("hasAnyRole('VALIDATEUR', 'ADMIN', 'SUPER_ADMIN', 'IMMATRICULATEUR', 'AUDIT', 'UTILISATEUR')")
     public ResponseEntity<ApiResponse<Map<String, Long>>> profileChangeRequestsPendingCount() {
         return ResponseEntity.ok(ApiResponse.ok(Map.of("count", profileChangeRequestService.countPending())));
     }
