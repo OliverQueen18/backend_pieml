@@ -13,7 +13,7 @@
 
     <groupId>ml.gouv.pie</groupId>
     <artifactId>pieml-backend</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
     <name>pieml-backend</name>
     <description>Plateforme d'Immatriculation des Engins du Mali - Backend</description>
 
