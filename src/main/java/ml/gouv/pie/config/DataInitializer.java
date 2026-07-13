@@ -191,6 +191,9 @@ public class DataInitializer {
                     roleDef(Role.ADMIN, "Gestionnaire de Centre",
                             "Gère un centre et peut créer des comptes Public, validateurs et immatriculateurs", true,
                             DefaultRolePermissions.forRole(Role.ADMIN)),
+                    roleDef(Role.AUDIT, "Auditeur",
+                            "Consultation des informations des centres associés (lecture seule)", true,
+                            DefaultRolePermissions.forRole(Role.AUDIT)),
                     roleDef(Role.VALIDATEUR, "Validateur",
                             "Validation et rejet des dossiers d'immatriculation", true,
                             DefaultRolePermissions.forRole(Role.VALIDATEUR)),
@@ -228,6 +231,9 @@ public class DataInitializer {
         upsertRoleDefinition(Role.ADMIN, "Gestionnaire de Centre",
                 "Gère un centre et peut créer des comptes Public, validateurs et immatriculateurs",
                 DefaultRolePermissions.forRole(Role.ADMIN));
+        upsertRoleDefinition(Role.AUDIT, "Auditeur",
+                "Consultation des informations des centres associés (lecture seule)",
+                DefaultRolePermissions.forRole(Role.AUDIT));
         upsertRoleDefinition(Role.UTILISATEUR, "Utilisateur",
                 "Consultation opérationnelle : dossiers, citoyens et notifications",
                 DefaultRolePermissions.forRole(Role.UTILISATEUR));

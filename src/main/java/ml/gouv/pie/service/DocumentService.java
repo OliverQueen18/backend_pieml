@@ -52,7 +52,13 @@ public class DocumentService {
         Document document = documentRepository.findByDossierIdAndTypeDocumentId(dossierId, typeDocumentId)
                 .orElseThrow(() -> new BusinessException("Ce type de document n'est pas requis pour ce dossier"));
 
+        ensureCitizenCanUploadDocument(dossier, document);
+
         try {
+            if (document.getFilePath() != null && !document.getFilePath().isBlank()) {
+                Files.deleteIfExists(storedFileService.resolve(document.getFilePath()));
+            }
+
             Path dir = storedFileService.dossierDirectory(dossier.getReferenceNumber());
             Files.createDirectories(dir);
 
@@ -202,6 +208,17 @@ public class DocumentService {
                 NotificationType.WARNING);
 
         return mapperService.toDto(dossier);
+    }
+
+    private void ensureCitizenCanUploadDocument(Dossier dossier, Document document) {
+        DossierStatus dossierStatus = dossier.getStatus();
+        if (dossierStatus == DossierStatus.DRAFT || dossierStatus == DossierStatus.REJECTED) {
+            return;
+        }
+        if (dossierStatus == DossierStatus.PAID && document.getStatus() == DocumentStatus.REJECTED) {
+            return;
+        }
+        throw new BusinessException("Ce dossier ne permet plus la modification des documents");
     }
 
     private Dossier loadDossierWithDocuments(Long dossierId) {

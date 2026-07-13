@@ -59,6 +59,14 @@ public class CitizenController {
         return ResponseEntity.ok(ApiResponse.ok("Dossier soumis", dossierService.submitDossier(user.getEmail(), id)));
     }
 
+    @PostMapping("/dossiers/{id}/resubmit")
+    public ResponseEntity<ApiResponse<DtoMapper.DossierDto>> resubmitRejectedDossier(
+            @AuthenticationPrincipal User user, @PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                "Dossier resoumis",
+                dossierService.resubmitRejectedDossier(user.getEmail(), id)));
+    }
+
     @DeleteMapping("/dossiers/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteDraftDossier(
             @AuthenticationPrincipal User user, @PathVariable Long id) {

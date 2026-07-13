@@ -34,14 +34,16 @@ public class AdminController {
     private final ProfileChangeRequestService profileChangeRequestService;
 
     @GetMapping("/dashboard")
-    public ResponseEntity<ApiResponse<DtoMapper.AdminDashboardStatsDto>> dashboard() {
-        return ResponseEntity.ok(ApiResponse.ok(adminService.getDashboardStats()));
+    public ResponseEntity<ApiResponse<DtoMapper.AdminDashboardStatsDto>> dashboard(
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(ApiResponse.ok(adminService.getDashboardStats(user)));
     }
 
     @GetMapping("/dashboard/charts")
     public ResponseEntity<ApiResponse<DtoMapper.AdminDashboardChartsDto>> dashboardCharts(
-            @RequestParam(defaultValue = "30d") String period) {
-        return ResponseEntity.ok(ApiResponse.ok(adminService.getDashboardCharts(period)));
+            @RequestParam(defaultValue = "30d") String period,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(ApiResponse.ok(adminService.getDashboardCharts(period, user)));
     }
 
     @GetMapping("/dossiers")
@@ -374,7 +376,7 @@ public class AdminController {
     }
 
     @GetMapping("/notifications")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'AUDIT', 'UTILISATEUR')")
     public ResponseEntity<ApiResponse<List<DtoMapper.AdminNotificationDto>>> listNotifications() {
         return ResponseEntity.ok(ApiResponse.ok(adminService.listNotifications()));
     }
@@ -402,15 +404,18 @@ public class AdminController {
     }
 
     @GetMapping("/payments")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public ResponseEntity<ApiResponse<List<DtoMapper.AdminPaymentDto>>> listPayments() {
-        return ResponseEntity.ok(ApiResponse.ok(adminService.listPayments()));
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'AUDIT', 'PUBLIC')")
+    public ResponseEntity<ApiResponse<List<DtoMapper.AdminPaymentDto>>> listPayments(
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(ApiResponse.ok(adminService.listPayments(user)));
     }
 
     @GetMapping("/payments/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public ResponseEntity<ApiResponse<DtoMapper.AdminPaymentDto>> getPayment(@PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.ok(adminService.getPayment(id)));
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'AUDIT', 'PUBLIC')")
+    public ResponseEntity<ApiResponse<DtoMapper.AdminPaymentDto>> getPayment(
+            @AuthenticationPrincipal User user,
+            @PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.ok(adminService.getPayment(id, user)));
     }
 
     @PutMapping("/payments/{id}")

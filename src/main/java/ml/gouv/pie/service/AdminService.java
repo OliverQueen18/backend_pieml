@@ -33,7 +33,10 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
 import java.sql.Timestamp;
+import java.util.ArrayList;
 
 @Service
 @RequiredArgsConstructor
@@ -52,7 +55,16 @@ public class AdminService {
     private final NotificationRepository notificationRepository;
     private final PaymentRepository paymentRepository;
 
-    public DtoMapper.AdminDashboardStatsDto getDashboardStats() {
+    @Transactional(readOnly = true)
+    public DtoMapper.AdminDashboardStatsDto getDashboardStats(User currentUser) {
+        User actor = resolveUserWithCenters(currentUser);
+        if (hasUnrestrictedCenterAccess(actor)) {
+            return getGlobalDashboardStats();
+        }
+        return buildScopedDashboardStats(actor);
+    }
+
+    private DtoMapper.AdminDashboardStatsDto getGlobalDashboardStats() {
         long total = dossierRepository.countAllDossiers();
         long enCours = Arrays.stream(DossierStatus.values())
                 .filter(s -> s != DossierStatus.COMPLETED && s != DossierStatus.REJECTED)
@@ -70,11 +82,58 @@ public class AdminService {
                 .build();
     }
 
-    public DtoMapper.AdminDashboardChartsDto getDashboardCharts(String period) {
+    private DtoMapper.AdminDashboardStatsDto buildScopedDashboardStats(User actor) {
+        List<Dossier> dossiers = loadAccessibleDossiers(actor);
+        long enCours = dossiers.stream()
+                .filter(d -> d.getStatus() != DossierStatus.COMPLETED && d.getStatus() != DossierStatus.REJECTED)
+                .count();
+        long valides = dossiers.stream()
+                .filter(d -> isValidatedLikeStatus(d.getStatus()))
+                .count();
+        long rejetes = dossiers.stream()
+                .filter(d -> d.getStatus() == DossierStatus.REJECTED)
+                .count();
+        long immatriculations = dossiers.stream()
+                .filter(d -> d.getStatus() == DossierStatus.COMPLETED)
+                .count();
+        long rendezVous = dossiers.stream()
+                .filter(d -> d.getStatus() == DossierStatus.APPOINTMENT_SCHEDULED)
+                .count();
+        long totalCitoyens = dossiers.stream()
+                .map(d -> d.getCitizen().getId())
+                .distinct()
+                .count();
+        Set<Long> centerIds = actor.getCenters().stream().map(Center::getId).collect(Collectors.toSet());
+        long totalUtilisateurs = userRepository.findStaffWithCentersByRoleNot(Role.CITOYEN).stream()
+                .filter(u -> u.getCenters().stream().anyMatch(c -> centerIds.contains(c.getId())))
+                .count();
+
+        return DtoMapper.AdminDashboardStatsDto.builder()
+                .totalDossiers(dossiers.size())
+                .dossiersEnCours(enCours)
+                .dossiersValides(valides)
+                .dossiersRejetes(rejetes)
+                .immatriculations(immatriculations)
+                .totalCitoyens(totalCitoyens)
+                .totalUtilisateurs(totalUtilisateurs)
+                .rendezVousPlanifies(rendezVous)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public DtoMapper.AdminDashboardChartsDto getDashboardCharts(String period, User currentUser) {
+        User actor = resolveUserWithCenters(currentUser);
         String normalized = normalizePeriod(period);
         LocalDateTime sinceDateTime = resolveSinceDateTime(normalized);
         LocalDate sinceDate = sinceDateTime.toLocalDate();
+        if (hasUnrestrictedCenterAccess(actor)) {
+            return buildGlobalDashboardCharts(normalized, sinceDateTime, sinceDate);
+        }
+        return buildScopedDashboardCharts(normalized, sinceDateTime, sinceDate, actor);
+    }
 
+    private DtoMapper.AdminDashboardChartsDto buildGlobalDashboardCharts(
+            String normalized, LocalDateTime sinceDateTime, LocalDate sinceDate) {
         List<DtoMapper.DashboardChartPointDto> dossiersByPeriod = mapChartRows(
                 "6m".equals(normalized)
                         ? dossierRepository.countDossiersByMonthSince(Timestamp.valueOf(sinceDateTime))
@@ -113,6 +172,107 @@ public class AdminService {
                 .statsByCenter(centerStats.values().stream().toList())
                 .recentNotifications(recentNotifications)
                 .build();
+    }
+
+    private DtoMapper.AdminDashboardChartsDto buildScopedDashboardCharts(
+            String normalized, LocalDateTime sinceDateTime, LocalDate sinceDate, User actor) {
+        List<Dossier> dossiers = loadAccessibleDossiers(actor);
+        List<DtoMapper.DashboardChartPointDto> dossiersByPeriod =
+                aggregateDossiersByPeriod(dossiers, sinceDateTime, normalized);
+
+        Set<Long> centerIds = actor.getCenters().stream().map(Center::getId).collect(Collectors.toSet());
+        Map<Long, DtoMapper.DashboardCenterStatDto> centerStats = new LinkedHashMap<>();
+        actor.getCenters().stream()
+                .sorted((a, b) -> {
+                    int city = a.getCity().compareToIgnoreCase(b.getCity());
+                    return city != 0 ? city : a.getName().compareToIgnoreCase(b.getName());
+                })
+                .forEach(center -> centerStats.put(center.getId(), DtoMapper.DashboardCenterStatDto.builder()
+                        .centerId(center.getId())
+                        .centerName(center.getName())
+                        .city(center.getCity())
+                        .appointments(0)
+                        .dossiers(0)
+                        .build()));
+
+        if (!centerIds.isEmpty()) {
+            for (Object[] row : appointmentRepository.countAppointmentsByCenterIdsSince(sinceDate, centerIds)) {
+                long centerId = ((Number) row[0]).longValue();
+                long count = ((Number) row[3]).longValue();
+                DtoMapper.DashboardCenterStatDto stat = centerStats.get(centerId);
+                if (stat != null) {
+                    stat.setAppointments(count);
+                }
+            }
+        }
+
+        List<DtoMapper.AdminNotificationDto> recentNotifications = notificationRepository
+                .findAllWithUserOrderByCreatedAtDesc().stream()
+                .limit(8)
+                .map(this::toNotificationDto)
+                .toList();
+
+        return DtoMapper.AdminDashboardChartsDto.builder()
+                .period(normalized)
+                .dossiersByPeriod(dossiersByPeriod)
+                .statsByCenter(centerStats.values().stream().toList())
+                .recentNotifications(recentNotifications)
+                .build();
+    }
+
+    private List<Dossier> loadAccessibleDossiers(User actor) {
+        return dossierRepository.searchForAdmin(null, null, null, null).stream()
+                .filter(d -> canAccessDossier(actor, d))
+                .toList();
+    }
+
+    private boolean hasUnrestrictedCenterAccess(User user) {
+        return user == null || user.getRole() == Role.SUPER_ADMIN;
+    }
+
+    private boolean isValidatedLikeStatus(DossierStatus status) {
+        return status == DossierStatus.VALIDATED
+                || status == DossierStatus.PAID
+                || status == DossierStatus.APPOINTMENT_SCHEDULED
+                || status == DossierStatus.IMMATRICULATION_IN_PROGRESS
+                || status == DossierStatus.COMPLETED;
+    }
+
+    private List<DtoMapper.DashboardChartPointDto> aggregateDossiersByPeriod(
+            List<Dossier> dossiers, LocalDateTime since, String period) {
+        if ("6m".equals(period)) {
+            Map<YearMonth, Long> grouped = new TreeMap<>();
+            DateTimeFormatter labelFormat = DateTimeFormatter.ofPattern("MM/yyyy");
+            for (Dossier dossier : dossiers) {
+                if (dossier.getCreatedAt() == null || dossier.getCreatedAt().isBefore(since)) {
+                    continue;
+                }
+                YearMonth month = YearMonth.from(dossier.getCreatedAt());
+                grouped.merge(month, 1L, Long::sum);
+            }
+            List<DtoMapper.DashboardChartPointDto> points = new ArrayList<>();
+            grouped.forEach((month, count) -> points.add(DtoMapper.DashboardChartPointDto.builder()
+                    .label(month.format(labelFormat))
+                    .value(count)
+                    .build()));
+            return points;
+        }
+
+        Map<LocalDate, Long> grouped = new TreeMap<>();
+        DateTimeFormatter labelFormat = DateTimeFormatter.ofPattern("dd/MM");
+        for (Dossier dossier : dossiers) {
+            if (dossier.getCreatedAt() == null || dossier.getCreatedAt().isBefore(since)) {
+                continue;
+            }
+            LocalDate day = dossier.getCreatedAt().toLocalDate();
+            grouped.merge(day, 1L, Long::sum);
+        }
+        List<DtoMapper.DashboardChartPointDto> points = new ArrayList<>();
+        grouped.forEach((day, count) -> points.add(DtoMapper.DashboardChartPointDto.builder()
+                .label(day.format(labelFormat))
+                .value(count)
+                .build()));
+        return points;
     }
 
     private String normalizePeriod(String period) {
@@ -247,6 +407,11 @@ public class AdminService {
             throw new BusinessException("Modification réservée aux comptes staff");
         }
         if (request.getCenterIds() != null) {
+            if (user.getRole() == Role.SUPER_ADMIN) {
+                throw new BusinessException(
+                        "Le super administrateur n'est pas associé à des centres",
+                        HttpStatus.BAD_REQUEST);
+            }
             validateAssignableCenters(actor, request.getCenterIds());
         }
         if (request.getPhone() != null && !request.getPhone().isBlank()) {
@@ -267,6 +432,9 @@ public class AdminService {
             }
             validateCreatableRole(actor, request.getRole());
             user.setRole(request.getRole());
+            if (request.getRole() == Role.SUPER_ADMIN) {
+                user.getCenters().clear();
+            }
         }
         if (request.getEnabled() != null) {
             user.setEnabled(request.getEnabled());
@@ -334,10 +502,12 @@ public class AdminService {
     public List<DtoMapper.CenterDto> listCenters(User currentUser) {
         User actor = resolveUserWithCenters(currentUser);
         List<Center> centers = centerRepository.findAllByOrderByCityAscNameAsc();
-        if (actor.getRole() == Role.ADMIN || actor.getRole() == Role.SUPER_ADMIN) {
+        if (actor != null && actor.getRole() == Role.SUPER_ADMIN) {
             return centers.stream().map(this::toCenterDto).toList();
         }
-        Set<Long> allowed = actor.getCenters().stream().map(Center::getId).collect(Collectors.toSet());
+        Set<Long> allowed = actor != null
+                ? actor.getCenters().stream().map(Center::getId).collect(Collectors.toSet())
+                : Set.of();
         if (allowed.isEmpty()) {
             return List.of();
         }
@@ -478,34 +648,25 @@ public class AdminService {
         if (user == null) {
             return true;
         }
-        Role role = user.getRole();
-        if (role == Role.ADMIN || role == Role.SUPER_ADMIN) {
+        if (user.getRole() == Role.SUPER_ADMIN) {
             return true;
         }
         Set<Long> centerIds = user.getCenters().stream().map(Center::getId).collect(Collectors.toSet());
-        if (role == Role.VALIDATEUR && isTreatmentStatus(dossier.getStatus())) {
-            if (centerIds.isEmpty()) {
-                return true;
-            }
-            if (dossier.getAppointment() != null) {
-                return centerIds.contains(dossier.getAppointment().getCenter().getId());
-            }
-            if (dossier.getProcessingCenter() != null) {
-                return centerIds.contains(dossier.getProcessingCenter().getId());
-            }
-            return true;
+        if (centerIds.isEmpty()) {
+            return false;
         }
-        if (dossier.getAppointment() != null && !centerIds.isEmpty()) {
-            return centerIds.contains(dossier.getAppointment().getCenter().getId());
-        }
-        return false;
+        Long dossierCenterId = resolveDossierCenterId(dossier);
+        return dossierCenterId != null && centerIds.contains(dossierCenterId);
     }
 
-    private boolean isTreatmentStatus(DossierStatus status) {
-        return status == DossierStatus.PAID
-                || status == DossierStatus.VALIDATED
-                || status == DossierStatus.APPOINTMENT_SCHEDULED
-                || status == DossierStatus.IMMATRICULATION_IN_PROGRESS;
+    private Long resolveDossierCenterId(Dossier dossier) {
+        if (dossier.getAppointment() != null && dossier.getAppointment().getCenter() != null) {
+            return dossier.getAppointment().getCenter().getId();
+        }
+        if (dossier.getProcessingCenter() != null) {
+            return dossier.getProcessingCenter().getId();
+        }
+        return null;
     }
 
     private void validateAssignableCenters(User actor, List<Long> centerIds) {
@@ -513,7 +674,7 @@ public class AdminService {
             return;
         }
         User resolved = resolveUserWithCenters(actor);
-        if (resolved.getRole() == Role.ADMIN || resolved.getRole() == Role.SUPER_ADMIN) {
+        if (resolved.getRole() == Role.SUPER_ADMIN) {
             return;
         }
         Set<Long> allowed = resolved.getCenters().stream().map(Center::getId).collect(Collectors.toSet());
@@ -568,7 +729,7 @@ public class AdminService {
             return;
         }
         if (actor.getRole() == Role.ADMIN) {
-            if (targetRole == Role.SUPER_ADMIN || targetRole == Role.ADMIN) {
+            if (targetRole == Role.SUPER_ADMIN || targetRole == Role.ADMIN || targetRole == Role.AUDIT) {
                 throw new BusinessException("Un gestionnaire de centre ne peut pas créer ce type de compte", HttpStatus.FORBIDDEN);
             }
             if (targetRole == Role.PUBLIC || targetRole == Role.VALIDATEUR
@@ -581,6 +742,10 @@ public class AdminService {
     }
 
     private void applyCenters(User user, List<Long> centerIds) {
+        if (user.getRole() == Role.SUPER_ADMIN) {
+            user.getCenters().clear();
+            return;
+        }
         if (centerIds == null) {
             return;
         }
@@ -777,16 +942,22 @@ public class AdminService {
 
     // ── Paiements ────────────────────────────────────────────────────────
 
-    public List<DtoMapper.AdminPaymentDto> listPayments() {
+    public List<DtoMapper.AdminPaymentDto> listPayments(User currentUser) {
+        User actor = resolveUserWithCenters(currentUser);
         return paymentRepository.findAllWithDossierOrderByIdDesc().stream()
+                .filter(p -> p.getDossier() == null || canAccessDossier(actor, p.getDossier()))
                 .map(this::toPaymentDto)
                 .toList();
     }
 
     @Transactional(readOnly = true)
-    public DtoMapper.AdminPaymentDto getPayment(Long id) {
+    public DtoMapper.AdminPaymentDto getPayment(Long id, User currentUser) {
         Payment payment = paymentRepository.findByIdWithDossier(id)
                 .orElseThrow(() -> new BusinessException("Paiement non trouvé", HttpStatus.NOT_FOUND));
+        if (payment.getDossier() != null
+                && !canAccessDossier(resolveUserWithCenters(currentUser), payment.getDossier())) {
+            throw new BusinessException("Accès non autorisé à ce paiement", HttpStatus.FORBIDDEN);
+        }
         return toPaymentDto(payment);
     }
 

@@ -29,6 +29,14 @@ public final class DefaultRolePermissions {
                     Permission.APPOINTMENTS_MANAGE,
                     Permission.IMMATRICULATION_PROCESS
             );
+            case AUDIT -> EnumSet.of(
+                    Permission.ADMIN_DASHBOARD_VIEW,
+                    Permission.DOSSIERS_VIEW,
+                    Permission.CITIZENS_VIEW,
+                    Permission.CENTERS_VIEW,
+                    Permission.NOTIFICATIONS_VIEW,
+                    Permission.PAYMENTS_VIEW
+            );
             case VALIDATEUR -> EnumSet.of(
                     Permission.ADMIN_DASHBOARD_VIEW,
                     Permission.DOSSIERS_VIEW,

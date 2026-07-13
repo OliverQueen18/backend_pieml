@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public interface AppointmentRepository extends JpaRepository<Appointment, Long> {
     Optional<Appointment> findByDossierId(Long dossierId);
@@ -25,4 +26,17 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
             ORDER BY COUNT(a.id) DESC
             """, nativeQuery = true)
     List<Object[]> countAppointmentsByCenterSince(@Param("sinceDate") java.sql.Date sinceDate);
+
+    @Query("""
+            SELECT c.id, c.name, c.city, COUNT(a.id)
+            FROM Appointment a
+            JOIN a.center c
+            WHERE a.appointmentDate >= :sinceDate
+            AND c.id IN :centerIds
+            GROUP BY c.id, c.name, c.city
+            ORDER BY COUNT(a.id) DESC
+            """)
+    List<Object[]> countAppointmentsByCenterIdsSince(
+            @Param("sinceDate") LocalDate sinceDate,
+            @Param("centerIds") Set<Long> centerIds);
 }

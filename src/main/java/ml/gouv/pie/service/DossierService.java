@@ -157,6 +157,58 @@ public class DossierService {
     }
 
     @Transactional
+    public DtoMapper.DossierDto resubmitRejectedDossier(String email, Long dossierId) {
+        Dossier dossier = getOwnedDossier(email, dossierId);
+
+        if (dossier.getStatus() != DossierStatus.REJECTED) {
+            throw new BusinessException("Seuls les dossiers rejetés peuvent être resoumis");
+        }
+
+        boolean hasRejectedRequired = dossier.getDocuments().stream()
+                .filter(d -> d.getTypeDocument().isObligatoire())
+                .anyMatch(d -> d.getStatus() == DocumentStatus.REJECTED);
+
+        if (hasRejectedRequired) {
+            throw new BusinessException("Merci de téléverser à nouveau les documents rejetés");
+        }
+
+        boolean allRequiredReady = dossier.getDocuments().stream()
+                .filter(d -> d.getTypeDocument().isObligatoire())
+                .allMatch(d -> d.getFileName() != null && !d.getFileName().isBlank()
+                        && (d.getStatus() == DocumentStatus.UPLOADED || d.getStatus() == DocumentStatus.VALIDATED));
+
+        if (!allRequiredReady) {
+            throw new BusinessException("Tous les documents obligatoires doivent être fournis avant la resoumission");
+        }
+
+        for (Document document : dossier.getDocuments()) {
+            if (document.getTypeDocument().isObligatoire()
+                    && document.getFileName() != null
+                    && !document.getFileName().isBlank()) {
+                document.setStatus(DocumentStatus.UPLOADED);
+            }
+        }
+
+        Payment payment = dossier.getPayment();
+        if (payment != null && payment.getStatus() == PaymentStatus.COMPLETED) {
+            dossier.setStatus(DossierStatus.PAID);
+        } else {
+            dossier.setStatus(DossierStatus.SUBMITTED);
+        }
+        dossier.setRejectionReason(null);
+        dossierRepository.save(dossier);
+
+        String ref = dossier.getReferenceNumber();
+        String message = payment != null && payment.getStatus() == PaymentStatus.COMPLETED
+                ? "Dossier " + ref + " corrigé et renvoyé pour traitement."
+                : "Dossier " + ref + " corrigé. Procédez au paiement si nécessaire.";
+        notificationService.create(dossier.getCitizen().getUser(), message, NotificationType.DOSSIER, false);
+        emailService.sendDossierSubmittedEmail(dossier.getCitizen().getUser(), ref);
+
+        return mapperService.toDto(dossier);
+    }
+
+    @Transactional
     public void deleteDraftDossier(String email, Long dossierId) {
         Dossier dossier = getOwnedDossier(email, dossierId);
 
