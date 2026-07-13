@@ -48,7 +48,7 @@ app:
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:4200,https://e-pie.ml,http://e-pie.ml,https://www.e-pie.ml,http://www.e-pie.ml}
   upload:
-    dir: ${UPLOAD_DIR:./uploads}
+    dir: ${UPLOAD_DIR:./uploads/PIEML}
   payment:
     registration-fee: 12000
     service-fee: 0

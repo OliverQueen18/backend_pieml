@@ -14,14 +14,17 @@ WORKDIR /app
 
 RUN apk add --no-cache wget \
     && addgroup -S spring \
-    && adduser -S spring -G spring
+    && adduser -S spring -G spring \
+    && mkdir -p /app/uploads/PIEML \
+    && chown -R spring:spring /app/uploads
 
 COPY --from=build /app/target/pieml-backend-*.jar app.jar
 RUN chown spring:spring app.jar
 
 USER spring:spring
 
-ENV SERVER_PORT=7000
+ENV SERVER_PORT=7000 \
+    UPLOAD_DIR=/app/uploads/PIEML
 EXPOSE 7000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \

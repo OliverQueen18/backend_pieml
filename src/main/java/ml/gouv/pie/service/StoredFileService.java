@@ -1,22 +1,42 @@
 package ml.gouv.pie.service;
 
+import jakarta.annotation.PostConstruct;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import ml.gouv.pie.config.UploadProperties;
 import ml.gouv.pie.exception.BusinessException;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
 @Service
+@RequiredArgsConstructor
+@Slf4j
 public class StoredFileService {
 
-    @Value("${app.upload.dir}")
-    private String uploadDir;
+    private final UploadProperties uploadProperties;
+
+    @PostConstruct
+    public void ensureUploadRootExists() {
+        try {
+            Path root = uploadRoot();
+            Files.createDirectories(root);
+            if (!Files.isWritable(root)) {
+                throw new IllegalStateException("Upload directory is not writable: " + root);
+            }
+            log.info("Répertoire de stockage PIEML prêt : {}", root);
+        } catch (IOException e) {
+            throw new IllegalStateException("Impossible de créer le répertoire upload : "
+                    + uploadProperties.getDir(), e);
+        }
+    }
 
     public Path uploadRoot() {
-        return Paths.get(uploadDir).toAbsolutePath().normalize();
+        return Paths.get(uploadProperties.getDir()).toAbsolutePath().normalize();
     }
 
     public Path dossierDirectory(String referenceNumber, String... subdirectories) {

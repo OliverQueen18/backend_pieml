@@ -1,6 +1,7 @@
 package ml.gouv.pie.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import ml.gouv.pie.dto.DtoMapper;
 import ml.gouv.pie.entity.Document;
 import ml.gouv.pie.entity.Dossier;
@@ -29,6 +30,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class DocumentService {
 
     private final DocumentRepository documentRepository;
@@ -57,7 +59,7 @@ public class DocumentService {
             String ext = getExtension(file.getOriginalFilename());
             String storedName = typeDocument.getCode() + "_" + UUID.randomUUID().toString().substring(0, 8) + ext;
             Path target = dir.resolve(storedName);
-            Files.copy(file.getInputStream(), target);
+            Files.copy(file.getInputStream(), target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
 
             document.setFileName(file.getOriginalFilename());
             document.setFilePath(storedFileService.toStoredPath(target));
@@ -68,7 +70,11 @@ public class DocumentService {
             documentRepository.save(document);
 
         } catch (IOException e) {
-            throw new BusinessException("Erreur lors du téléversement", HttpStatus.INTERNAL_SERVER_ERROR);
+            log.error("Échec téléversement dossier {} vers {} : {}",
+                    dossierId, storedFileService.uploadRoot(), e.getMessage(), e);
+            throw new BusinessException(
+                    "Impossible d'enregistrer le fichier sur le serveur. Vérifiez UPLOAD_DIR et les droits d'écriture.",
+                    HttpStatus.INTERNAL_SERVER_ERROR);
         }
 
         return mapperService.toDto(dossier);

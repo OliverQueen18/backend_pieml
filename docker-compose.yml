@@ -3,15 +3,15 @@ services:
     image: postgres:16-alpine
     container_name: pieml-postgres
     environment:
-      POSTGRES_DB: ${DB_NAME:-bd_pieml}
-      POSTGRES_USER: ${DB_USER:-oservices}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-Services@2025*!}
+      POSTGRES_DB: ${PIEML_DB:-${DB_NAME:-bd_pieml}}
+      POSTGRES_USER: ${PIEML_DB_USER:-${DB_USER:-oservices}}
+      POSTGRES_PASSWORD: ${PIEML_DB_PASS:-${DB_PASSWORD:-Services@2025*!}}
     ports:
       - "${DB_PORT:-5433}:5432"
     volumes:
       - pieml_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-oservices} -d ${DB_NAME:-bd_pieml}"]
+      test: ["CMD-SHELL", "pg_isready -U ${PIEML_DB_USER:-${DB_USER:-oservices}} -d ${PIEML_DB:-${DB_NAME:-bd_pieml}}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -27,17 +27,20 @@ services:
       SERVER_PORT: 7000
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_NAME: ${DB_NAME:-bd_pieml}
-      DB_USER: ${DB_USER:-oservices}
-      DB_PASSWORD: ${DB_PASSWORD:-Services@2025*!}
+      DB_NAME: ${PIEML_DB:-${DB_NAME:-bd_pieml}}
+      DB_USER: ${PIEML_DB_USER:-${DB_USER:-oservices}}
+      DB_PASSWORD: ${PIEML_DB_PASS:-${DB_PASSWORD:-Services@2025*!}}
       CORS_ORIGINS: ${CORS_ORIGINS:-https://e-pie.ml,http://e-pie.ml,https://www.e-pie.ml,http://www.e-pie.ml}
       FRONTEND_URL: ${FRONTEND_URL:-https://e-pie.ml}
-      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
-      MAIL_ENABLED: ${MAIL_ENABLED:-false}
+      JWT_SECRET: ${PIEML_JWT_SECRET:-${JWT_SECRET:-change-me-in-production}}
+      MAIL_ENABLED: ${MAIL_ENABLED:-true}
+      MAIL_USERNAME: ${SMTP_USER:-}
+      MAIL_PASSWORD: ${SMTP_PASSWORD:-}
+      UPLOAD_DIR: ${PIEML_UPLOAD_DIR:-${UPLOAD_DIR:-/app/uploads/PIEML}}
     ports:
       - "7000:7000"
     volumes:
-      - pieml_uploads:/app/uploads
+      - ${PIEML_UPLOAD_HOST_PATH:-${UPLOAD_HOST_PATH:-pieml_uploads}}:/app/uploads/PIEML
 
   frontend:
     build: ../frontend_pieml
