@@ -11,6 +11,7 @@ import ml.gouv.pie.service.TariffService;
 import ml.gouv.pie.service.TypeDocumentService;
 import ml.gouv.pie.service.VehicleBrandService;
 import ml.gouv.pie.service.VehicleTypeService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 import jakarta.validation.Valid;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/public")
@@ -33,6 +35,9 @@ public class PublicController {
     private final ContactService contactService;
     private final VehicleBrandService vehicleBrandService;
     private final VehicleTypeService vehicleTypeService;
+
+    @Value("${app.version:1.0.0}")
+    private String appVersion;
 
     @GetMapping("/stats")
     public ResponseEntity<ApiResponse<DtoMapper.PublicStatsDto>> getPublicStats() {
@@ -72,6 +77,11 @@ public class PublicController {
     @GetMapping("/vehicle-types")
     public ResponseEntity<ApiResponse<List<DtoMapper.VehicleLookupDto>>> getVehicleTypes() {
         return ResponseEntity.ok(ApiResponse.ok(vehicleTypeService.getActiveTypes()));
+    }
+
+    @GetMapping("/version")
+    public ResponseEntity<ApiResponse<Map<String, String>>> getVersion() {
+        return ResponseEntity.ok(ApiResponse.ok(Map.of("version", appVersion)));
     }
 
     @PostMapping("/contact")

@@ -1,6 +1,8 @@
 spring:
   application:
     name: pieml-backend
+  config:
+    import: optional:classpath:app-version.properties
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:bd_pieml}
     username: ${DB_USER:oservices}
